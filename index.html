@@ -2,26 +2,36 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>videojs-hls-quality-selector Demo</title>
-  <link href="node_modules/video.js/dist/video-js.css" rel="stylesheet">
-  <link href="dist/videojs-hls-quality-selector.css" rel="stylesheet">
+  <title>videojs-contextmenu-ui Demo</title>
+  <link href="https://phuongmychi.github.io/videojs/video-js.css" rel="stylesheet">
+  <link href="https://phuongmychi.github.io/videojs/videojs-contextmenu-ui.css" rel="stylesheet">
 </head>
 <body>
-  <video id="videojs-hls-quality-selector-player" class="video-js vjs-default-skin" width="640" height="360" controls>
-    <source src="https://bitdash-a.akamaihd.net/content/MI201109210084_1/m3u8s/f08e80da-bf1d-4e3d-8899-f0f6155f6efa.m3u8" type="application/x-mpegURL">
+  <video id="videojs-contextmenu-ui-player" class="video-js vjs-default-skin" controls>
+    <source src="https://music.24hgame.vn//nhac/Thuong%20Ve%20Mien%20Trung%20_%20Be%20Phuong%20My%20Chi.mp4" type='video/mp4'>
   </video>
   <ul>
-    <li><a href="test/">Run unit tests in browser.</a></li>
-    <li><a href="docs/api/">Read generated docs.</a></li>
-  </ul>
+    <li><a href="test/debug.html">Run unit tests in browser.</a></li>
 
-  <script src="node_modules/video.js/dist/video.js"></script>
-  <script src="node_modules/videojs-contrib-quality-levels/dist/videojs-contrib-quality-levels.js"></script>
-  <script src="dist/videojs-hls-quality-selector.js"></script>
+  </ul>
+  <script src="https://phuongmychi.github.io/videojs/video.js"></script>
+  <script src="https://phuongmychi.github.io/videojs/videojs-contextmenu.js"></script>
+  <script src="https://phuongmychi.github.io/videojs/videojs-contextmenu-ui.js"></script>
   <script>
     (function(window, videojs) {
-      var player = window.player = videojs('videojs-hls-quality-selector-player');
-      player.hlsQualitySelector();
+      var player = window.player = videojs('videojs-contextmenu-ui-player');
+
+      player.contextmenuUI({
+        content: [{
+          href: 'https://facebook.com/phuongmychi',
+          label: 'Phuong My Chi Muzik'
+        }, {
+          label: 'Phuong My Chi',
+          listener: function() {
+            alert('I love Phuong My Chi');
+          }
+        }]
+      });
     }(window, window.videojs));
   </script>
 </body>
