@@ -1,170 +1,197 @@
-import document from 'global/document';
 import videojs from 'video.js';
-import ContextMenu from './context-menu';
-import {getPointerPosition} from './util';
 import {version as VERSION} from '../package.json';
+import ConcreteButton from './ConcreteButton';
+import ConcreteMenuItem from './ConcreteMenuItem';
+
+// Default options for the plugin.
+const defaults = {};
+
+// Cross-compatibility for Video.js 5 and 6.
+const registerPlugin = videojs.registerPlugin || videojs.plugin;
+// const dom = videojs.dom || videojs;
 
 /**
- * Whether or not the player has an active context menu.
- *
- * @param  {Player} player
- * @return {boolean}
+ * VideoJS HLS Quality Selector Plugin class.
  */
-function hasMenu(player) {
-  return player.hasOwnProperty('contextmenuUI') &&
-    player.contextmenuUI.hasOwnProperty('menu') &&
-    player.contextmenuUI.menu.el();
-}
+class HlsQualitySelectorPlugin {
 
-/**
- * Defines which elements should be excluded from displaying the context menu
- *
- * @param  {Object} targetEl The DOM element that is being targeted
- * @return {boolean} Whether or not the element should be excluded from displaying the context menu
- */
-function excludeElements(targetEl) {
-  const tagName = targetEl.tagName.toLowerCase();
+  /**
+   * Plugin Constructor.
+   *
+   * @param {Player} player - The videojs player instance.
+   * @param {Object} options - The plugin options.
+   */
+  constructor(player, options) {
+    this.player = player;
 
-  return tagName === 'input' || tagName === 'textarea';
-}
-
-/**
- * Calculates the position of a menu based on the pointer position and player
- * size.
- *
- * @param  {Object} pointerPosition
- * @param  {Object} playerSize
- * @return {Object}
- */
-function findMenuPosition(pointerPosition, playerSize) {
-  return {
-    left: Math.round(playerSize.width * pointerPosition.x),
-    top: Math.round(playerSize.height - (playerSize.height * pointerPosition.y))
-  };
-}
-
-/**
- * Handles contextmenu events.
- *
- * @param  {Event} e
- */
-function onContextMenu(e) {
-
-  // If this event happens while the custom menu is open, close it and do
-  // nothing else. This will cause native contextmenu events to be intercepted
-  // once again; so, the next time a contextmenu event is encountered, we'll
-  // open the custom menu.
-  if (hasMenu(this)) {
-    this.contextmenuUI.menu.dispose();
-    return;
+    // If there is quality levels plugin and the HLS tech exists
+    // then continue.
+    if (this.player.qualityLevels && this.getHls()) {
+      // Create the quality button.
+      this.createQualityButton();
+      this.bindPlayerEvents();
+    }
   }
 
-  if (this.contextmenuUI.options_.excludeElements(e.target)) {
-    return;
+  /**
+   * Returns HLS Plugin
+   *
+   * @return {*} - videojs-hls-contrib plugin.
+   */
+  getHls() {
+    return this.player.tech({ IWillNotUseThisInPlugins: true }).hls;
   }
 
-  // Calculate the positioning of the menu based on the player size and
-  // triggering event.
-  const pointerPosition = getPointerPosition(this.el(), e);
-  const playerSize = this.el().getBoundingClientRect();
-  const menuPosition = findMenuPosition(pointerPosition, playerSize);
-  // A workaround for Firefox issue  where "oncontextmenu" event
-  // leaks "click" event to document https://bugzilla.mozilla.org/show_bug.cgi?id=990614
-  const documentEl = videojs.browser.IS_FIREFOX ? document.documentElement : document;
+  /**
+   * Binds listener for quality level changes.
+   */
+  bindPlayerEvents() {
+    this.player.qualityLevels().on('addqualitylevel', this.onAddQualityLevel.bind(this));
+  }
 
-  e.preventDefault();
+  /**
+   * Adds the quality menu button to the player control bar.
+   */
+  createQualityButton() {
 
-  const menu = this.contextmenuUI.menu = new ContextMenu(this, {
-    content: this.contextmenuUI.content,
-    position: menuPosition
+    const player = this.player;
+
+    this._qualityButton = new ConcreteButton(player);
+
+    const placementIndex = player.controlBar.children().length - 2;
+    const concreteButtonInstance = player.controlBar.addChild(this._qualityButton,
+      {componentClass: 'qualitySelector'},
+      placementIndex);
+
+    concreteButtonInstance.addClass('vjs-quality-selector');
+    concreteButtonInstance
+      .menuButton_.$('.vjs-icon-placeholder').className += ' vjs-icon-hd';
+    concreteButtonInstance.removeClass('vjs-hidden');
+
+  }
+
+  /**
+   * Builds individual quality menu items.
+   *
+   * @param {Object} item - Individual quality menu item.
+   * @return {ConcreteMenuItem} - Menu item
+   */
+  getQualityMenuItem(item) {
+    const player = this.player;
+
+    return new ConcreteMenuItem(player, item, this._qualityButton, this);
+  }
+
+  /**
+   * Executed when a quality level is added from HLS playlist.
+   */
+  onAddQualityLevel() {
+
+    const player = this.player;
+    const qualityList = player.qualityLevels();
+    const levels = qualityList.levels_ || [];
+    const levelItems = [];
+
+    for (let i = 0; i < levels.length; ++i) {
+      if (!levelItems.filter(_existingItem => {
+        return _existingItem.item && _existingItem.item.value === levels[i].height;
+      }).length) {
+        const levelItem = this.getQualityMenuItem.call(this, {
+          label: levels[i].height + 'p',
+          value: levels[i].height
+        });
+
+        levelItems.push(levelItem);
+      }
+    }
+
+    levelItems.sort((current, next) => {
+      if ((typeof current !== 'object') || (typeof next !== 'object')) {
+        return -1;
+      }
+      if (current.item.value < next.item.value) {
+        return -1;
+      }
+      if (current.item.value > next.item.value) {
+        return 1;
+      }
+      return 0;
+    });
+
+    levelItems.push(this.getQualityMenuItem.call(this, {
+      label: player.localize('Auto'),
+      value: 'auto',
+      selected: true
+    }));
+
+    if (this._qualityButton) {
+      this._qualityButton.createItems = function() {
+        return levelItems;
+      };
+      this._qualityButton.update();
+    }
+
+  }
+
+  /**
+   * Sets quality (based on media height)
+   *
+   * @param {number} height - A number representing HLS playlist.
+   */
+  setQuality(height) {
+    const qualityList = this.player.qualityLevels();
+
+    for (let i = 0; i < qualityList.length; ++i) {
+      const quality = qualityList[i];
+
+      quality.enabled = (quality.height === height || height === 'auto');
+    }
+    this._qualityButton.unpressButton();
+  }
+
+}
+
+/**
+ * Function to invoke when the player is ready.
+ *
+ * This is a great place for your plugin to initialize itself. When this
+ * function is called, the player will have its DOM and child components
+ * in place.
+ *
+ * @function onPlayerReady
+ * @param    {Player} player
+ *           A Video.js player object.
+ *
+ * @param    {Object} [options={}]
+ *           A plain object containing options for the plugin.
+ */
+const onPlayerReady = (player, options) => {
+  player.addClass('vjs-hls-quality-selector');
+  player.hlsQualitySelector = new HlsQualitySelectorPlugin(player, options);
+};
+
+/**
+ * A video.js plugin.
+ *
+ * In the plugin function, the value of `this` is a video.js `Player`
+ * instance. You cannot rely on the player being in a "ready" state here,
+ * depending on how the plugin is invoked. This may or may not be important
+ * to you; if not, remove the wait for "ready"!
+ *
+ * @function hlsQualitySelector
+ * @param    {Object} [options={}]
+ *           An object of options left to the plugin author to define.
+ */
+const hlsQualitySelector = function(options) {
+  this.ready(() => {
+    onPlayerReady(this, videojs.mergeOptions(defaults, options));
   });
+};
 
-  // This is for backward compatibility. We no longer have the `closeMenu`
-  // function, but removing it would necessitate a major version bump.
-  this.contextmenuUI.closeMenu = () => {
-    videojs.log.warn('player.contextmenuUI.closeMenu() is deprecated, please use player.contextmenuUI.menu.dispose() instead!');
-    menu.dispose();
-  };
+// Register the plugin with video.js.
+registerPlugin('hlsQualitySelector', hlsQualitySelector);
 
-  menu.on('dispose', () => {
-    videojs.off(documentEl, ['click', 'tap'], menu.dispose);
-    this.removeChild(menu);
-    delete this.contextmenuUI.menu;
-  });
+// Include the version number.
+hlsQualitySelector.VERSION = VERSION;
 
-  this.addChild(menu);
-
-  const menuSize = menu.el_.getBoundingClientRect();
-  const bodySize = document.body.getBoundingClientRect();
-
-  if (this.contextmenuUI.keepInside ||
-      menuSize.right > bodySize.width ||
-      menuSize.bottom > bodySize.height) {
-    menu.el_.style.left = Math.floor(Math.min(
-      menuPosition.left,
-      this.player_.currentWidth() - menu.currentWidth()
-    )) + 'px';
-    menu.el_.style.top = Math.floor(Math.min(
-      menuPosition.top,
-      this.player_.currentHeight() - menu.currentHeight()
-    )) + 'px';
-  }
-
-  videojs.on(documentEl, ['click', 'tap'], menu.dispose);
-}
-
-/**
- * Creates a menu for contextmenu events.
- *
- * @function contextmenuUI
- * @param    {Object} options
- * @param    {Array}  options.content
- *           An array of objects which populate a content list within the menu.
- * @param    {boolean}  options.keepInside
- *           Whether to always keep the menu inside the player
- * @param    {function}  options.excludeElements
- *           Defines which elements should be excluded from displaying the context menu
- */
-function contextmenuUI(options) {
-  const defaults = {
-    keepInside: true,
-    excludeElements
-  };
-
-  options = videojs.mergeOptions(defaults, options);
-
-  if (!Array.isArray(options.content)) {
-    throw new Error('"content" required');
-  }
-
-  // If we have already invoked the plugin, teardown before setting up again.
-  if (hasMenu(this)) {
-    this.contextmenuUI.menu.dispose();
-    this.off('contextmenu', this.contextmenuUI.onContextMenu);
-
-    // Deleting the player-specific contextmenuUI plugin function/namespace will
-    // restore the original plugin function, so it can be called again.
-    delete this.contextmenuUI;
-  }
-
-  // Wrap the plugin function with an player instance-specific function. This
-  // allows us to attach the menu to it without affecting other players on
-  // the page.
-  const cmui = this.contextmenuUI = function() {
-    contextmenuUI.apply(this, arguments);
-  };
-
-  cmui.onContextMenu = videojs.bind(this, onContextMenu);
-  cmui.content = options.content;
-  cmui.keepInside = options.keepInside;
-  cmui.options_ = options;
-  cmui.VERSION = VERSION;
-
-  this.on('contextmenu', cmui.onContextMenu);
-  this.ready(() => this.addClass('vjs-contextmenu-ui'));
-}
-
-videojs.registerPlugin('contextmenuUI', contextmenuUI);
-contextmenuUI.VERSION = VERSION;
-
-export default contextmenuUI;
+export default hlsQualitySelector;
