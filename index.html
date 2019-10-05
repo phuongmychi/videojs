@@ -1,38 +1,73 @@
 <!doctype html>
 <html>
+
 <head>
   <meta charset="utf-8">
-  <title>videojs-contextmenu-ui Demo</title>
-  <link href="https://phuongmychi.github.io/videojs/video-js.css" rel="stylesheet">
-  <link href="https://phuongmychi.github.io/videojs/videojs-contextmenu-ui.css" rel="stylesheet">
+  <title>videojs-related Demo</title>
+  <link href="/node_modules/video.js/dist/video-js.css" rel="stylesheet">
+  <link href="/dist/videojs-related.css" rel="stylesheet">
 </head>
+
 <body>
-  <video id="videojs-contextmenu-ui-player" class="video-js vjs-default-skin" controls>
-    <source src="https://music.24hgame.vn//nhac/Thuong%20Ve%20Mien%20Trung%20_%20Be%20Phuong%20My%20Chi.mp4" type='video/mp4'>
+  <video id="videojs-related-player" class="video-js vjs-default-skin" data-slug="rabbit" controls>
+    <!-- <source src="//vjs.zencdn.net/v/oceans.mp4" type='video/mp4'> -->
+    <source src="http://192.168.89.1:9999/resources/oceans.mp4" type='video/mp4'>
+    <!-- <source src="//vjs.zencdn.net/v/oceans.webm" type='video/webm'> -->
   </video>
   <ul>
-    <li><a href="test/debug.html">Run unit tests in browser.</a></li>
-
+    <li><a href="/test/">Run unit tests in browser.</a></li>
   </ul>
-  <script src="https://phuongmychi.github.io/videojs/video.js"></script>
-  <script src="https://phuongmychi.github.io/videojs/videojs-contextmenu.js"></script>
-  <script src="https://phuongmychi.github.io/videojs/videojs-contextmenu-ui.js"></script>
+  <script src="/node_modules/video.js/dist/video.js"></script>
+  <script src="/dist/videojs-related.js"></script>
+  <script type="text/x-tmpl" id="related-actions">
+    <div class="action-container">
+      <section class="section">
+        <a href="#" class="action" id="return"></a>
+      </section>
+      <section class="section">
+        <a href="#" class="action" id="fb"></a>
+      </section>
+      <section class="section">
+        <a href="#" class="action" id="twitter"></a>
+      </section>
+      <section class="section links">
+        <a href="#" id="copy" class="action"></a>
+      </section>
+    </div>
+  </script>
+  <script type="text/x-tmpl" id="related-videos">
+    <div class="video-container">
+      <p>{%=o.title%}</p>
+      {% for (var i=0; i
+      <o.videos.length; i++) { %} <article class="video-preview">
+        <a href="{%=o.videos[i].url%}">
+          <img src="{%=o.videos[i].image%}" alt="">
+          <span>{%=o.videos[i].title%}</span>
+        </a>
+        </article>
+        {% } %}
+    </div>
+  </script>
   <script>
-    (function(window, videojs) {
-      var player = window.player = videojs('videojs-contextmenu-ui-player');
+  (function(window, videojs) {
+    var player = window.player = videojs('videojs-related-player');
 
-      player.contextmenuUI({
-        content: [{
-          href: 'https://facebook.com/phuongmychi',
-          label: 'Phuong My Chi Muzik'
-        }, {
-          label: 'Phuong My Chi',
-          listener: function() {
-            alert('I love Phuong My Chi');
-          }
-        }]
-      });
-    }(window, window.videojs));
+    player.on('related:fetched', function(event, data) {
+      this.related.createWall(data.response)
+    });
+
+    player.related({
+      base_url: '/resources/related.json',
+      gotoUrl: false,
+      createQuery: function() {
+        var queryValue = player.el().getAttribute('data-slug'),
+          query = 'slug=' + queryValue;
+        return query;
+      }
+    });
+
+  }(window, window.videojs));
   </script>
 </body>
+
 </html>
