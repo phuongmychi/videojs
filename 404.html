@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+  <title>404 Not Found</title>
+  <link rel="stylesheet" href="https://phuongmychi.github.io/libs/bootstrap.min.css">
+     <link rel="stylesheet" href="https://phuongmychi.github.io/libs/pmcstyles.min.css">
+
+
+  <body>
+    <div class='container'>
+    <h3>Rất tiếc, trang bạn vừa thực hiện không có</h3>
+      <h4>Bạn sẽ được chuyển về trang chủ  trong: <span id="lovephuongmychi">5</span> giây</h4>
+    <script>
+        setInterval(function() {
+            var div = document.querySelector("#lovephuongmychi");
+            var count = div.textContent * 1 - 1;
+            div.textContent = count;
+            if (count <= 0) {
+        window.location.href = "https://phuongmychi.github.io";
+            }
+        }, 1000);
+    </script>
+      <hr style="text-align:center;width:85%;color:black;border-top: 1px solid #A9A9A9;"> 
+
+      <p>© 2019 PhuongMyChi Entertainment, All rights reserved </p>
+    </div>
+  </body>
+</html> 
